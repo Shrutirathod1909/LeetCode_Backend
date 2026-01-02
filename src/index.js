@@ -14,7 +14,7 @@ const cors = require('cors')
 // console.log("Hello")
 
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: process.env.FRONTEND_URL,
     credentials: true 
 }))
 
@@ -27,7 +27,9 @@ app.use('/submission',submitRouter);
 app.use('/ai',aiRouter);
 app.use("/video",videoRouter);
 
-
+app.get("/apitesting", (req, res) => {
+  res.send("Backend running 🚀");
+});
 const InitalizeConnection = async ()=>{
     try{
 
