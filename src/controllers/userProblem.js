@@ -9,12 +9,29 @@ const createProblem = async (req, res) => {
   try {
     const { referenceSolution, visibleTestCases } = req.body;
 
-    if (!referenceSolution || !visibleTestCases) {
-      return res.status(400).json({ message: "referenceSolution and visibleTestCases required" });
+    // ✅ 1. Basic validation
+    if (!Array.isArray(referenceSolution) || referenceSolution.length === 0) {
+      return res.status(400).json({ message: "referenceSolution must be a non-empty array" });
     }
 
-    for (const { language, completeCode } of referenceSolution) {
+    if (!Array.isArray(visibleTestCases) || visibleTestCases.length === 0) {
+      return res.status(400).json({ message: "visibleTestCases must be a non-empty array" });
+    }
+
+    // ✅ 2. Validate reference solution via Judge
+    for (const rs of referenceSolution) {
+      const { language, completeCode } = rs;
+
+      if (!language || !completeCode) {
+        return res.status(400).json({ message: "language and completeCode required in referenceSolution" });
+      }
+
       const languageId = getLanguageById(language);
+
+      if (!languageId) {
+        return res.status(400).json({ message: `Unsupported language: ${language}` });
+      }
+
       const submissions = visibleTestCases.map(tc => ({
         source_code: completeCode,
         language_id: languageId,
@@ -22,28 +39,54 @@ const createProblem = async (req, res) => {
         expected_output: tc.output
       }));
 
-      const submitResult = await submitBatch(submissions);
+      let submitResult;
+      try {
+        submitResult = await submitBatch(submissions);
+      } catch (err) {
+        console.error("Judge submitBatch error:", err);
+        return res.status(500).json({ message: "Judge API submit failed" });
+      }
+
       const tokens = submitResult.map(r => r.token);
-      const results = await submitToken(tokens);
+
+      let results;
+      try {
+        results = await submitToken(tokens);
+      } catch (err) {
+        console.error("Judge submitToken error:", err);
+        return res.status(500).json({ message: "Judge API result fetch failed" });
+      }
 
       for (const test of results) {
         if (test.status_id !== 3) {
-          return res.status(400).json({ message: "Reference solution failed" });
+          return res.status(400).json({
+            message: "Reference solution failed test cases",
+            judgeStatus: test
+          });
         }
       }
     }
 
+    // ✅ 3. Create problem
     const problem = await Problem.create({
-      ...req.result && req.result._id ? { problemCreator: req.result._id } : {},
-      ...req.body
+      ...req.body,
+      problemCreator: req.result?._id
     });
 
-    res.status(201).json({ message: "Problem created successfully", problem });
+    return res.status(201).json({
+      message: "Problem created successfully",
+      problem
+    });
+
   } catch (err) {
     console.error("Create Problem Error:", err);
-    res.status(500).json({ message: "Server Error", error: err.message });
+    return res.status(500).json({
+      message: "Server Error",
+      error: err.message
+    });
   }
 };
+
 
 /* ---------------- UPDATE PROBLEM ---------------- */
 const updateProblem = async (req, res) => {
