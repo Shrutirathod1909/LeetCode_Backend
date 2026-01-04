@@ -14,15 +14,18 @@ const {
   submittedProblem
 } = require("../controllers/userProblem");
 
-// ADMIN ROUTES
+// -------------------- ADMIN ROUTES --------------------
 problemRouter.post("/create", adminMiddleware, createProblem);
 problemRouter.put("/update/:id", adminMiddleware, updateProblem);
 problemRouter.delete("/delete/:id", adminMiddleware, deleteProblem);
 
-// USER ROUTES
-problemRouter.get("/problemById/:id", userMiddleware, getProblemById);
-problemRouter.get("/getAllProblem", userMiddleware, getAllProblem);
-problemRouter.get("/problemSolvedByUser", userMiddleware, solvedAllProblembyUser);
-problemRouter.get("/submittedProblem/:pid", userMiddleware, submittedProblem);
+// -------------------- USER / AUTH ROUTES --------------------
+// Optional: getAllProblem & getProblemById can be public
+problemRouter.get("/", getAllProblem); // All problems (public)
+problemRouter.get("/:id", getProblemById); // Single problem (public)
+
+// Protected routes (user must be logged in)
+problemRouter.get("/solved", userMiddleware, solvedAllProblembyUser);
+problemRouter.get("/submissions/:pid", userMiddleware, submittedProblem);
 
 module.exports = problemRouter;
