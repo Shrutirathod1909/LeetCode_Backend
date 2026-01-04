@@ -10,18 +10,20 @@ const submitCode = async (req, res) => {
     const problemId = req.params.id;
     let { code, language } = req.body;
 
-    // Validate input
     if (!userId || !problemId || !code || !language) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
     if (language === "cpp") language = "c++";
 
-    // Fetch problem
+    const languageId = getLanguageById(language);
+    if (!languageId) {
+      return res.status(400).json({ message: "Unsupported language" });
+    }
+
     const problem = await Problem.findById(problemId);
     if (!problem) return res.status(404).json({ message: "Problem not found" });
 
-    // Store submission in DB as pending
     const submittedResult = await Submission.create({
       userId,
       problemId,
@@ -31,9 +33,7 @@ const submitCode = async (req, res) => {
       testCasesTotal: problem.hiddenTestCases.length
     });
 
-    // Judge0 batch submission
-    const languageId = getLanguageById(language);
-    const submissions = problem.hiddenTestCases.map((tc) => ({
+    const submissions = problem.hiddenTestCases.map(tc => ({
       source_code: code,
       language_id: languageId,
       stdin: tc.input,
@@ -41,41 +41,40 @@ const submitCode = async (req, res) => {
     }));
 
     const submitResult = await submitBatch(submissions);
-    const resultTokens = submitResult.map((r) => r.token);
-    const testResults = await submitToken(resultTokens);
+    const tokens = submitResult.submissions.map(r => r.token);
+    const testResults = await submitToken(tokens);
 
-    // Evaluate results
-    let testCasesPassed = 0, runtime = 0, memory = 0, status = "accepted", errorMessage = null;
+    let passed = 0, runtime = 0, memory = 0;
+    let status = "accepted", errorMessage = null;
 
     for (const test of testResults) {
       if (test.status_id === 3) {
-        testCasesPassed++;
-        runtime += parseFloat(test.time);
-        memory = Math.max(memory, test.memory);
+        passed++;
+        runtime += Number(test.time || 0);
+        memory = Math.max(memory, test.memory || 0);
       } else {
-        status = test.status_id === 4 ? "error" : "wrong";
-        errorMessage = test.stderr || null;
+        status = "wrong";
+        errorMessage = test.stderr || test.compile_output || null;
+        break;
       }
     }
 
-    // Update submission in DB
     submittedResult.status = status;
-    submittedResult.testCasesPassed = testCasesPassed;
-    submittedResult.errorMessage = errorMessage;
+    submittedResult.testCasesPassed = passed;
     submittedResult.runtime = runtime;
     submittedResult.memory = memory;
+    submittedResult.errorMessage = errorMessage;
     await submittedResult.save();
 
-    // Add problemId to user's solved list if not already present
-    if (!req.result.problemSolved.includes(problemId) && status === "accepted") {
+    if (status === "accepted" && !req.result.problemSolved.includes(problemId)) {
       req.result.problemSolved.push(problemId);
       await req.result.save();
     }
 
     res.status(201).json({
       accepted: status === "accepted",
-      totalTestCases: submittedResult.testCasesTotal,
-      passedTestCases: testCasesPassed,
+      passedTestCases: passed,
+      totalTestCases: problem.hiddenTestCases.length,
       runtime,
       memory
     });
@@ -85,6 +84,7 @@ const submitCode = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error", error: err.message });
   }
 };
+
 
 // ------------------- RUN CODE (Visible Test Cases) -------------------
 const runCode = async (req, res) => {
