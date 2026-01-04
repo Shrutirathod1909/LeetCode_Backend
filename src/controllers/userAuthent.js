@@ -8,7 +8,6 @@ const jwt = require("jsonwebtoken");
 const register = async (req, res) => {
   try {
     validate(req.body);
-
     const { firstName, emailId, password } = req.body;
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -20,11 +19,12 @@ const register = async (req, res) => {
       role: "user",
     });
 
-    const token = jwt.sign(
-      { _id: user._id, role: user.role },
-      process.env.JWT_KEY,
-      { expiresIn: "1h" }
-    );
+    const token = jwt.sign({ _id: user._id, role: user.role }, process.env.JWT_KEY, {
+      expiresIn: "1h",
+    });
+
+    // Send cookie + token in JSON
+    res.cookie("token", token, { maxAge: 60 * 60 * 1000, httpOnly: true });
 
     res.status(201).json({
       token,
@@ -60,11 +60,12 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const token = jwt.sign(
-      { _id: user._id, role: user.role },
-      process.env.JWT_KEY,
-      { expiresIn: "1h" }
-    );
+    const token = jwt.sign({ _id: user._id, role: user.role }, process.env.JWT_KEY, {
+      expiresIn: "1h",
+    });
+
+    // ✅ Cookie + JSON token
+    res.cookie("token", token, { maxAge: 60 * 60 * 1000, httpOnly: true });
 
     res.status(200).json({
       token,
@@ -77,7 +78,7 @@ const login = async (req, res) => {
       message: "Login successful",
     });
   } catch (err) {
-    res.status(500).json({ message: "Login failed" });
+    res.status(500).json({ message: "Login failed", error: err.message });
   }
 };
 
@@ -85,7 +86,6 @@ const login = async (req, res) => {
 const adminRegister = async (req, res) => {
   try {
     validate(req.body);
-
     const { firstName, emailId, password } = req.body;
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -130,11 +130,12 @@ const adminLogin = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const token = jwt.sign(
-      { _id: admin._id, role: admin.role },
-      process.env.JWT_KEY,
-      { expiresIn: "1h" }
-    );
+    const token = jwt.sign({ _id: admin._id, role: admin.role }, process.env.JWT_KEY, {
+      expiresIn: "1h",
+    });
+
+    // ✅ Cookie + JSON token
+    res.cookie("token", token, { maxAge: 60 * 60 * 1000, httpOnly: true });
 
     res.status(200).json({
       token,
@@ -147,14 +148,14 @@ const adminLogin = async (req, res) => {
       message: "Admin login successful",
     });
   } catch (err) {
-    res.status(500).json({ message: "Admin login failed" });
+    res.status(500).json({ message: "Admin login failed", error: err.message });
   }
 };
 
 /* ================= LOGOUT ================= */
 const logout = async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
+    const token = req.headers.authorization?.split(" ")[1] || req.cookies.token;
     if (!token) return res.status(400).json({ message: "Token missing" });
 
     const payload = jwt.decode(token);
@@ -164,7 +165,7 @@ const logout = async (req, res) => {
 
     res.status(200).json({ message: "Logged out successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Logout failed" });
+    res.status(500).json({ message: "Logout failed", error: err.message });
   }
 };
 
@@ -175,7 +176,7 @@ const deleteProfile = async (req, res) => {
     await User.findByIdAndDelete(userId);
     res.status(200).json({ message: "Profile deleted successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Delete failed" });
+    res.status(500).json({ message: "Delete failed", error: err.message });
   }
 };
 
