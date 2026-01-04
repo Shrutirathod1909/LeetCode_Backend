@@ -7,79 +7,101 @@ const SolutionVideo = require("../models/solutionVideo");
 /* ---------------- CREATE PROBLEM ---------------- */
 const createProblem = async (req, res) => {
   try {
-    const { referenceSolution, visibleTestCases } = req.body;
+    console.log("REQ BODY 👉", req.body);
+    console.log("ADMIN 👉", req.result?._id);
 
-    // ✅ 1. Basic validation
-    if (!Array.isArray(referenceSolution) || referenceSolution.length === 0) {
-      return res.status(400).json({ message: "referenceSolution must be a non-empty array" });
+    const {
+      title,
+      description,
+      difficulty,
+      tags,
+      visibleTestCases,
+      hiddenTestCases,
+      startCode,
+      referenceSolution
+    } = req.body;
+
+    /* ---------- BASIC VALIDATION ---------- */
+    if (!title || !description || !difficulty) {
+      return res.status(400).json({ message: "Title, description, difficulty required" });
     }
 
     if (!Array.isArray(visibleTestCases) || visibleTestCases.length === 0) {
-      return res.status(400).json({ message: "visibleTestCases must be a non-empty array" });
+      return res.status(400).json({ message: "At least 1 visible test case required" });
     }
 
-    // ✅ 2. Validate reference solution via Judge
+    if (!Array.isArray(referenceSolution) || referenceSolution.length === 0) {
+      return res.status(400).json({ message: "Reference solution required" });
+    }
+
+    /* ---------- JUDGE VALIDATION (SAFE MODE) ---------- */
     for (const rs of referenceSolution) {
       const { language, completeCode } = rs;
 
-      if (!language || !completeCode) {
-        return res.status(400).json({ message: "language and completeCode required in referenceSolution" });
-      }
-
       const languageId = getLanguageById(language);
-
       if (!languageId) {
         return res.status(400).json({ message: `Unsupported language: ${language}` });
       }
 
+      // ⚠️ DO NOT use expected_output (Judge crash protection)
       const submissions = visibleTestCases.map(tc => ({
         source_code: completeCode,
         language_id: languageId,
-        stdin: tc.input,
-        expected_output: tc.output
+        stdin: tc.input
       }));
 
-      let submitResult;
+      let submitResponse;
       try {
-        submitResult = await submitBatch(submissions);
+        submitResponse = await submitBatch(submissions);
       } catch (err) {
-        console.error("Judge submitBatch error:", err);
-        return res.status(500).json({ message: "Judge API submit failed" });
+        console.error("Judge submitBatch failed:", err);
+        return res.status(500).json({ message: "Judge submit failed" });
       }
 
-      const tokens = submitResult.map(r => r.token);
+      const tokens = submitResponse.map(r => r.token);
 
+      // 🔁 Wait until all testcases finished
       let results;
-      try {
+      let finished = false;
+
+      while (!finished) {
         results = await submitToken(tokens);
-      } catch (err) {
-        console.error("Judge submitToken error:", err);
-        return res.status(500).json({ message: "Judge API result fetch failed" });
+        finished = results.every(
+          r => r.status_id !== 1 && r.status_id !== 2
+        );
       }
 
-      for (const test of results) {
-        if (test.status_id !== 3) {
+      // ❌ If any test fails → reject problem
+      for (const r of results) {
+        if (r.status_id !== 3) {
           return res.status(400).json({
             message: "Reference solution failed test cases",
-            judgeStatus: test
+            judgeError: r
           });
         }
       }
     }
 
-    // ✅ 3. Create problem
+    /* ---------- SAVE PROBLEM ---------- */
     const problem = await Problem.create({
-      ...req.body,
-      problemCreator: req.result?._id
+      title,
+      description,
+      difficulty,
+      tags: Array.isArray(tags) ? tags : [tags], // 🛡️ schema safe
+      visibleTestCases,
+      hiddenTestCases,
+      startCode,
+      referenceSolution,
+      problemCreator: req.result._id
     });
 
     return res.status(201).json({
-      message: "Problem created successfully",
+      message: "Problem created successfully ✅",
       problem
     });
 
   } catch (err) {
-    console.error("Create Problem Error:", err);
+    console.error("Create Problem Fatal Error:", err);
     return res.status(500).json({
       message: "Server Error",
       error: err.message
