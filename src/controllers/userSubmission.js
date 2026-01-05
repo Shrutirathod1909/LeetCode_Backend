@@ -111,21 +111,22 @@ const runCode = async (req, res) => {
     }));
 
     const submitResult = await submitBatch(submissions);
-    const resultTokens = submitResult.map((r) => r.token);
-    const testResults = await submitToken(resultTokens);
+const resultTokens = submitResult.submissions.map((r) => r.token); // FIXED
+const testResults = await submitToken(resultTokens);
 
-    let testCasesPassed = 0, runtime = 0, memory = 0, success = true, errorMessage = null;
+let testCasesPassed = 0, runtime = 0, memory = 0, success = true, errorMessage = null;
 
-    for (const test of testResults) {
-      if (test.status_id === 3) {
-        testCasesPassed++;
-        runtime += parseFloat(test.time);
-        memory = Math.max(memory, test.memory);
-      } else {
-        success = false;
-        errorMessage = test.stderr || null;
-      }
-    }
+for (const test of testResults) {
+  if (test.status_id === 3) {
+    testCasesPassed++;
+    runtime += parseFloat(test.time || 0);
+    memory = Math.max(memory, test.memory || 0);
+  } else {
+    success = false;
+    errorMessage = test.stderr || test.compile_output || null;
+  }
+}
+
 
     res.status(201).json({
       success,
