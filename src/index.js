@@ -23,7 +23,8 @@ app.use(cookieParser());
 
 // Routes
 app.use('/user', authRouter);
-app.use('/problem', problemRouter);
+app.use('/api/problem', problemRouter);
+
 app.use('/submission', submitRouter);   // Judge0 submissions
 app.use('/ai', aiRouter);
 app.use('/video', videoRouter);
