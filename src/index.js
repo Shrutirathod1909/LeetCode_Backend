@@ -22,11 +22,11 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Routes
-app.use('/api/user', authRouter);
-app.use('/api/problem', problemRouter);
-app.use('/api/submission', submitRouter);
-app.use('/api/ai', aiRouter);
-app.use('/api/video', videoRouter);
+app.use('/user', authRouter);
+app.use('/problem', problemRouter);
+app.use('/submission', submitRouter);
+app.use('/ai', aiRouter);
+app.use('/video', videoRouter);
 
 
 // Test route
