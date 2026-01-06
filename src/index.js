@@ -22,12 +22,12 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Routes
-app.use('/user', authRouter);
+app.use('/api/user', authRouter);
 app.use('/api/problem', problemRouter);
+app.use('/api/submission', submitRouter);
+app.use('/api/ai', aiRouter);
+app.use('/api/video', videoRouter);
 
-app.use('/submission', submitRouter);   // Judge0 submissions
-app.use('/ai', aiRouter);
-app.use('/video', videoRouter);
 
 // Test route
 app.get("/apitesting", (req, res) => {
