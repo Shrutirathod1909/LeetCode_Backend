@@ -27,8 +27,9 @@ const submitBatch = async (submissions) => {
   };
 
   const response = await axios.request(options);
-  return response.data;
+  return response.data.submissions; // ✅ FIX
 };
+
 
 const submitToken = async (resultToken) => {
   const options = {

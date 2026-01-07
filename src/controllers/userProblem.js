@@ -8,8 +8,9 @@ const SolutionVideo = require("../models/solutionVideo");
 const createProblem = async (req, res) => {
   try {
     console.log("REQ BODY 👉", req.body);
-    console.log("ADMIN 👉", req.result?._id);
+    console.log("ADMIN 👉", req.user?._id);
 
+    
     const {
       title,
       description,
@@ -83,17 +84,18 @@ const createProblem = async (req, res) => {
     }
 
     /* ---------- SAVE PROBLEM ---------- */
-    const problem = await Problem.create({
-      title,
-      description,
-      difficulty,
-      tags: Array.isArray(tags) ? tags : [tags], // 🛡️ schema safe
-      visibleTestCases,
-      hiddenTestCases,
-      startCode,
-      referenceSolution,
-      problemCreator: req.result._id
-    });
+   const problem = await Problem.create({
+  title,
+  description,
+  difficulty,
+  tags: Array.isArray(tags) ? tags : [tags],
+  visibleTestCases,
+  hiddenTestCases,
+  startCode,
+  referenceSolution,
+  problemCreator: req.user._id   // ✅ FIXED
+});
+
 
     return res.status(201).json({
       message: "Problem created successfully ✅",
@@ -174,10 +176,12 @@ const getAllProblem = async (req, res) => {
 /* ---------------- SOLVED PROBLEMS ---------------- */
 const solvedAllProblembyUser = async (req, res) => {
   try {
-    if (!req.result || !req.result._id) return res.status(401).json({ message: "Unauthorized" });
+   if (!req.user || !req.user._id)
+  return res.status(401).json({ message: "Unauthorized" });
 
-    const user = await User.findById(req.result._id).select("problemSolved");
-    res.status(200).json(user.problemSolved || []);
+const user = await User.findById(req.user._id).select("problemSolved");
+res.status(200).json(user.problemSolved || []);
+
   } catch (err) {
     console.error("Solved Problems Error:", err);
     res.status(500).json({ message: "Server Error", error: err.message });
@@ -187,12 +191,13 @@ const solvedAllProblembyUser = async (req, res) => {
 /* ---------------- SUBMISSIONS ---------------- */
 const submittedProblem = async (req, res) => {
   try {
-    if (!req.result || !req.result._id) return res.status(401).json({ message: "Unauthorized" });
+   if (!req.user || !req.user._id)
+  return res.status(401).json({ message: "Unauthorized" });
 
-    const submissions = await Submission.find({
-      userId: req.result._id,
-      problemId: req.params.pid
-    });
+const submissions = await Submission.find({
+  userId: req.user._id,
+  problemId: req.params.pid
+});
 
     res.status(200).json(submissions);
   } catch (err) {

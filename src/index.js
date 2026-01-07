@@ -12,7 +12,7 @@ const problemRouter = require("./routes/problemCreator");
 const submitRouter = require("./routes/submit");
 const aiRouter = require("./routes/aiChatting");
 const videoRouter = require("./routes/videoCreator");
-
+app.set("trust proxy", 1)
 // Middleware
 app.use(cors({
     origin: process.env.FRONTEND_URL,
@@ -42,17 +42,19 @@ app.use((err, req, res, next) => {
 
 // Initialize DB & Redis and start server
 const InitializeConnection = async () => {
-    try {
-        await Promise.all([main(), redisClient.connect()]);
-        console.log("DB & Redis Connected");
-
-        const PORT = process.env.PORT || 5000;
-        app.listen(PORT, () => {
-            console.log("Server listening on port " + PORT);
-        });
-    } catch (err) {
-        console.error("Initialization Error: " + err);
+  try {
+    await main();
+    if (!redisClient.isOpen) {
+      await redisClient.connect();
     }
+
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () =>
+      console.log("Server listening on port " + PORT)
+    );
+  } catch (err) {
+    console.error("Initialization Error:", err);
+  }
 };
 
 InitializeConnection();

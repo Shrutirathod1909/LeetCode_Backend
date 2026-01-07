@@ -15,11 +15,12 @@ const problemSchema = new Schema({
         enum:['easy','medium','hard'],
         required:true,
     },
-    tags:{
-        type:String,
-        enum:['array','linkedList','graph','dp'],
-        required:true
-    },
+   tags: [{
+  type: String,
+  enum: ['array', 'linkedList', 'graph', 'dp'],
+  required: true
+}]
+,
     visibleTestCases:[
         {
             input:{
