@@ -65,8 +65,12 @@ const login = async (req, res) => {
     });
 
     // ✅ Cookie + JSON token
-    res.cookie("token", token, { maxAge: 60 * 60 * 1000, httpOnly: true });
-
+     res.cookie("token", token, {
+  httpOnly: true,
+  secure: true,        // REQUIRED on HTTPS
+  sameSite: "none",    // 🔥 REQUIRED for Netlify + Render
+  maxAge: 60 * 60 * 1000,
+});
     res.status(200).json({
       token,
       user: {
@@ -135,8 +139,12 @@ const adminLogin = async (req, res) => {
     });
 
     // ✅ Cookie + JSON token
-    res.cookie("token", token, { maxAge: 60 * 60 * 1000, httpOnly: true });
-
+    res.cookie("token", token, {
+  httpOnly: true,
+  secure: true,        // REQUIRED on HTTPS
+  sameSite: "none",    // 🔥 REQUIRED for Netlify + Render
+  maxAge: 60 * 60 * 1000,
+});
     res.status(200).json({
       token,
       admin: {
