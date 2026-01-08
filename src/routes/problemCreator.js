@@ -15,19 +15,16 @@ const {
 } = require("../controllers/userProblem");
 
 // -------------------- ADMIN ROUTES --------------------
-// Only admin can create, update, delete
 problemRouter.post("/admin/create", adminMiddleware, createProblem);
 problemRouter.put("/admin/update/:id", adminMiddleware, updateProblem);
 problemRouter.delete("/admin/delete/:id", adminMiddleware, deleteProblem);
 
 // -------------------- USER ROUTES --------------------
-// Protected routes (user must be logged in)
 problemRouter.get("/user/solved", userMiddleware, solvedAllProblembyUser);
 problemRouter.get("/user/submissions/:pid", userMiddleware, submittedProblem);
 
 // -------------------- PUBLIC ROUTES --------------------
-// Anyone can view all problems or a single problem
-problemRouter.get("/", getAllProblem);        // All problems (public)
-problemRouter.get("/:id", getProblemById);    // Single problem (public)
+problemRouter.get("/", getAllProblem);        // GET /problem
+problemRouter.get("/:id", getProblemById);    // GET /problem/:id
 
 module.exports = problemRouter;

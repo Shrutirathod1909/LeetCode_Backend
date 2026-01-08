@@ -172,7 +172,7 @@ const logout = async (req, res) => {
 /* ================= DELETE PROFILE ================= */
 const deleteProfile = async (req, res) => {
   try {
-    const userId = req.result._id;
+    const userId = req.user._id;
     await User.findByIdAndDelete(userId);
     res.status(200).json({ message: "Profile deleted successfully" });
   } catch (err) {

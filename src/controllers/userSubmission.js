@@ -6,7 +6,7 @@ const { getLanguageById, submitBatch, submitToken } = require("../utils/problemU
 // ------------------- SUBMIT CODE (Hidden Test Cases) -------------------
 const submitCode = async (req, res) => {
   try {
-    const userId = req.result?._id;
+    const userId = req.user?._id;
     const problemId = req.params.id;
     let { code, language } = req.body;
 
@@ -67,8 +67,8 @@ const submitCode = async (req, res) => {
     await submittedResult.save();
 
     if (status === "accepted" && !req.result.problemSolved.includes(problemId)) {
-      req.result.problemSolved.push(problemId);
-      await req.result.save();
+      req.user.problemSolved.push(problemId);
+      await req.user.save();
     }
 
     res.status(201).json({
@@ -89,7 +89,7 @@ const submitCode = async (req, res) => {
 // ------------------- RUN CODE (Visible Test Cases) -------------------
 const runCode = async (req, res) => {
   try {
-    const userId = req.result?._id;
+    const userId = req.user?._id;
     const problemId = req.params.id;
     let { code, language } = req.body;
 

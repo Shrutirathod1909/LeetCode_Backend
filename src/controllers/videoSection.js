@@ -127,7 +127,7 @@ const saveVideoMetadata = async (req, res) => {
 const deleteVideo = async (req, res) => {
   try {
     const { problemId } = req.params;
-    const userId = req.result._id;
+    const userId = req.user._id;
 
     const video = await SolutionVideo.findOneAndDelete({problemId:problemId});
     
