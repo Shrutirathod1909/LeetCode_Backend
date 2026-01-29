@@ -1,147 +1,215 @@
 const Problem = require("../models/problem");
 const Submission = require("../models/submission");
 const User = require("../models/user");
-const { getLanguageById, submitBatch, submitToken } = require("../utils/problemUtility");
+const {getLanguageById,submitBatch,submitToken} = require("../utils/problemUtility");
 
-// ------------------- SUBMIT CODE (Hidden Test Cases) -------------------
-const submitCode = async (req, res) => {
-  try {
-    const userId = req.user?._id;
-    const problemId = req.params.id;
-    let { code, language } = req.body;
+const submitCode = async (req,res)=>{
+   
+    // 
+    try{
+      
+       const userId = req.result._id;
+       const problemId = req.params.id;
 
-    if (!userId || !problemId || !code || !language) {
-      return res.status(400).json({ message: "Missing required fields" });
-    }
+       let {code,language} = req.body;
 
-    if (language === "cpp") language = "c++";
+      if(!userId||!code||!problemId||!language)
+        return res.status(400).send("Some field missing");
+      
 
-    const languageId = getLanguageById(language);
-    if (!languageId) {
-      return res.status(400).json({ message: "Unsupported language" });
-    }
-
-    const problem = await Problem.findById(problemId);
-    if (!problem) return res.status(404).json({ message: "Problem not found" });
-
+      if(language==='cpp')
+        language='c++'
+      
+      console.log(language);
+      
+    //    Fetch the problem from database
+       const problem =  await Problem.findById(problemId);
+    //    testcases(Hidden)
+    
+    //   Kya apne submission store kar du pehle....
     const submittedResult = await Submission.create({
-      userId,
-      problemId,
-      code,
-      language,
-      status: "pending",
-      testCasesTotal: problem.hiddenTestCases.length
-    });
+          userId,
+          problemId,
+          code,
+          language,
+          status:'pending',
+          testCasesTotal:problem.hiddenTestCases.length
+     })
 
-    const submissions = problem.hiddenTestCases.map(tc => ({
-      source_code: code,
-      language_id: languageId,
-      stdin: tc.input,
-      expected_output: tc.output
+    //    Judge0 code ko submit karna hai
+    
+    const languageId = getLanguageById(language);
+   
+    const submissions = problem.hiddenTestCases.map((testcase)=>({
+        source_code:code,
+        language_id: languageId,
+        stdin: testcase.input,
+        expected_output: testcase.output
     }));
 
+    
     const submitResult = await submitBatch(submissions);
-    const tokens = submitResult.submissions.map(r => r.token);
-    const testResults = await submitToken(tokens);
+    
+    const resultToken = submitResult.map((value)=> value.token);
 
-    let passed = 0, runtime = 0, memory = 0;
-    let status = "accepted", errorMessage = null;
+    const testResult = await submitToken(resultToken);
+    
 
-    for (const test of testResults) {
-      if (test.status_id === 3) {
-        passed++;
-        runtime += Number(test.time || 0);
-        memory = Math.max(memory, test.memory || 0);
-      } else {
-        status = "wrong";
-        errorMessage = test.stderr || test.compile_output || null;
-        break;
-      }
+    // submittedResult ko update karo
+    let testCasesPassed = 0;
+    let runtime = 0;
+    let memory = 0;
+    let status = 'accepted';
+    let errorMessage = null;
+
+
+    for(const test of testResult){
+        if(test.status_id==3){
+           testCasesPassed++;
+           runtime = runtime+parseFloat(test.time)
+           memory = Math.max(memory,test.memory);
+        }else{
+          if(test.status_id==4){
+            status = 'error'
+            errorMessage = test.stderr
+          }
+          else{
+            status = 'wrong'
+            errorMessage = test.stderr
+          }
+        }
     }
 
-    submittedResult.status = status;
-    submittedResult.testCasesPassed = passed;
+
+    // Store the result in Database in Submission
+    submittedResult.status   = status;
+    submittedResult.testCasesPassed = testCasesPassed;
+    submittedResult.errorMessage = errorMessage;
     submittedResult.runtime = runtime;
     submittedResult.memory = memory;
-    submittedResult.errorMessage = errorMessage;
+
     await submittedResult.save();
+    
+    // ProblemId ko insert karenge userSchema ke problemSolved mein if it is not persent there.
+    
+    // req.result == user Information
 
-    if (status === "accepted" && !req.result.problemSolved.includes(problemId)) {
-      req.user.problemSolved.push(problemId);
-      await req.user.save();
+    if(!req.result.problemSolved.includes(problemId)){
+      req.result.problemSolved.push(problemId);
+      await req.result.save();
     }
-
+    
+    const accepted = (status == 'accepted')
     res.status(201).json({
-      accepted: status === "accepted",
-      passedTestCases: passed,
-      totalTestCases: problem.hiddenTestCases.length,
+      accepted,
+      totalTestCases: submittedResult.testCasesTotal,
+      passedTestCases: testCasesPassed,
       runtime,
       memory
     });
-
-  } catch (err) {
-    console.error("Submit Code Error:", err);
-    res.status(500).json({ message: "Internal Server Error", error: err.message });
-  }
-};
-
-
-// ------------------- RUN CODE (Visible Test Cases) -------------------
-const runCode = async (req, res) => {
-  try {
-    const userId = req.user?._id;
-    const problemId = req.params.id;
-    let { code, language } = req.body;
-
-    if (!userId || !problemId || !code || !language) {
-      return res.status(400).json({ message: "Missing required fields" });
+       
     }
-
-    if (language === "cpp") language = "c++";
-
-    const problem = await Problem.findById(problemId);
-    if (!problem) return res.status(404).json({ message: "Problem not found" });
-
-    const languageId = getLanguageById(language);
-    const submissions = problem.visibleTestCases.map((tc) => ({
-      source_code: code,
-      language_id: languageId,
-      stdin: tc.input,
-      expected_output: tc.output
-    }));
-
-    const submitResult = await submitBatch(submissions);
-const resultTokens = submitResult.submissions.map((r) => r.token); // FIXED
-const testResults = await submitToken(resultTokens);
-
-let testCasesPassed = 0, runtime = 0, memory = 0, success = true, errorMessage = null;
-
-for (const test of testResults) {
-  if (test.status_id === 3) {
-    testCasesPassed++;
-    runtime += parseFloat(test.time || 0);
-    memory = Math.max(memory, test.memory || 0);
-  } else {
-    success = false;
-    errorMessage = test.stderr || test.compile_output || null;
-  }
+    catch(err){
+      res.status(500).send("Internal Server Error "+ err);
+    }
 }
 
 
-    res.status(201).json({
-      success,
-      testCasesPassed,
-      totalTestCases: problem.visibleTestCases.length,
-      runtime,
-      memory,
-      errorMessage,
-      testResults
-    });
+const runCode = async(req,res)=>{
+    
+     // 
+     try{
+      const userId = req.result._id;
+      const problemId = req.params.id;
 
-  } catch (err) {
-    console.error("Run Code Error:", err);
-    res.status(500).json({ message: "Internal Server Error", error: err.message });
-  }
-};
+      let {code,language} = req.body;
 
-module.exports = { submitCode, runCode };
+     if(!userId||!code||!problemId||!language)
+       return res.status(400).send("Some field missing");
+
+   //    Fetch the problem from database
+      const problem =  await Problem.findById(problemId);
+   //    testcases(Hidden)
+      if(language==='cpp')
+        language='c++'
+
+   //    Judge0 code ko submit karna hai
+
+   const languageId = getLanguageById(language);
+
+   const submissions = problem.visibleTestCases.map((testcase)=>({
+       source_code:code,
+       language_id: languageId,
+       stdin: testcase.input,
+       expected_output: testcase.output
+   }));
+
+
+   const submitResult = await submitBatch(submissions);
+   
+   const resultToken = submitResult.map((value)=> value.token);
+
+   const testResult = await submitToken(resultToken);
+
+    let testCasesPassed = 0;
+    let runtime = 0;
+    let memory = 0;
+    let status = true;
+    let errorMessage = null;
+
+    for(const test of testResult){
+        if(test.status_id==3){
+           testCasesPassed++;
+           runtime = runtime+parseFloat(test.time)
+           memory = Math.max(memory,test.memory);
+        }else{
+          if(test.status_id==4){
+            status = false
+            errorMessage = test.stderr
+          }
+          else{
+            status = false
+            errorMessage = test.stderr
+          }
+        }
+    }
+
+   
+  
+   res.status(201).json({
+    success:status,
+    testCases: testResult,
+    runtime,
+    memory
+   });
+      
+   }
+   catch(err){
+     res.status(500).send("Internal Server Error "+ err);
+   }
+}
+
+
+module.exports = {submitCode,runCode};
+
+
+
+//     language_id: 54,
+//     stdin: '2 3',
+//     expected_output: '5',
+//     stdout: '5',
+//     status_id: 3,
+//     created_at: '2025-05-12T16:47:37.239Z',
+//     finished_at: '2025-05-12T16:47:37.695Z',
+//     time: '0.002',
+//     memory: 904,
+//     stderr: null,
+//     token: '611405fa-4f31-44a6-99c8-6f407bc14e73',
+
+
+// User.findByIdUpdate({
+// })
+
+//const user =  User.findById(id)
+// user.firstName = "Mohit";
+// await user.save();
