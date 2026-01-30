@@ -14,7 +14,7 @@ const cors = require('cors')
 // console.log("Hello")
 
 app.use(cors({
-    origin: 'https://leetmaster.netlify.app',
+    origin: 'https://leetmasters.netlify.app',
     credentials: true 
 }))
 
